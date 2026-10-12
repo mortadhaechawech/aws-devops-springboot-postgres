@@ -1,7 +1,19 @@
-FROM eclipse-temurin:17-jdk-alpine
+# Stage 1: Build the application
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /workspace/app
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+COPY src src
 
-ARG JAR_FILE=./target/*.jar
+# THIS LINE FIXES THE WINDOWS ERROR:
+RUN sed -i -e 's/\r$//' ./mvnw && chmod +x ./mvnw
 
-COPY ${JAR_FILE} application.jar
+RUN ./mvnw clean package -DskipTests
 
-ENTRYPOINT ["java", "-jar", "application.jar"]
+# Stage 2: Create the lightweight runtime image
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=builder /workspace/app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
